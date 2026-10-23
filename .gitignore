@@ -1,4 +1,4 @@
-# Dependencies (install with npm inside DA1/, DA2/ or their backend/ folders)
+# Dependencies (install with npm inside DA2/, DA3/ or their backend/ folders)
 node_modules/
 
 # Local builds

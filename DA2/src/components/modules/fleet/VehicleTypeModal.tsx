@@ -5,7 +5,7 @@ import { Modal } from '../../common/Modal';
 interface VehicleTypeModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (vt: VehicleType) => Promise<boolean>;
+  onSave: (vt: VehicleType) => boolean;
   typeToEdit?: VehicleType | null;
 }
 
@@ -51,10 +51,10 @@ export const VehicleTypeModal: React.FC<VehicleTypeModalProps> = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-    const success = await onSave(formData);
+    const success = onSave(formData);
     if (success) {
       onClose();
     }

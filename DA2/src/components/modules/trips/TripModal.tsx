@@ -6,7 +6,7 @@ import { Modal } from '../../common/Modal';
 interface TripModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (trip: Trip, autoGenerateStops: boolean) => Promise<boolean>;
+  onSave: (trip: Trip, autoGenerateStops: boolean) => boolean;
   tripToEdit?: Trip | null;
 }
 
@@ -63,10 +63,10 @@ export const TripModal: React.FC<TripModalProps> = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-    const success = await onSave(formData, autoGenerateStops);
+    const success = onSave(formData, autoGenerateStops);
     if (success) {
       onClose();
     }

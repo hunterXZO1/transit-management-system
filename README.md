@@ -7,12 +7,12 @@ This repository is organised into two deliverable folders:
 
 ```
 transit-management-system/
-├── README.md     ← this file: the complete reference for the final project (DA2)
-├── DA1/          ← the project as it already existed in this repository (verbatim snapshot)
-└── DA2/          ← the final project: full-stack MySQL CRUD + Neo4j graph layer
+├── README.md     ← this file: the complete reference for the final project (DA3)
+├── DA2/          ← the project as it already existed in this repository (verbatim snapshot)
+└── DA3/          ← the final project: full-stack MySQL CRUD + Neo4j graph layer
 ```
 
-| | **DA1 — baseline** | **DA2 — final** |
+| | **DA2 — baseline** | **DA3 — final** |
 | :--- | :--- | :--- |
 | Tracked files | 48 | 68 |
 | Front end | React 18 + Vite + TS, Tailwind, modules for passengers, routes, fleet, trips, bookings | Same, plus a **Graph Explorer** module; `src/services/mockData.ts` removed |
@@ -21,12 +21,12 @@ transit-management-system/
 | Neo4j | — | `neo4j-driver` projection, idempotent MySQL→graph sync, three graph features, health endpoint |
 | Docs | Short README | Full README (834 lines) + `docs/GRAPH_DATABASE_JUSTIFICATION.md` (549-line academic report) |
 
-**DA1 is a verbatim snapshot** — nothing inside it was edited, so the two folders can be diffed to
-see exactly what this iteration changed. **DA2 is the version to run and submit.**
+**DA2 is a verbatim snapshot** — nothing inside it was edited, so the two folders can be diffed to
+see exactly what this iteration changed. **DA3 is the version to run and submit.**
 
 ---
 
-## 1. What DA2 adds over DA1
+## 1. What DA3 adds over DA2
 
 **New (21 files)** — `backend/config/{db.js,neo4j.js}`, `backend/models/`, `backend/services/{resourceService.js,compositeService.js,graphSyncService.js}`,
 `backend/controllers/neo4jTransitController.js`, `backend/routes/{resourceRoutes.js,neo4jRoutes.js}`,
@@ -60,7 +60,7 @@ flowchart LR
 ```
 
 ```
-Browser  ─  DA2/src/services/api.ts  (abort-signal timeout + envelope parsing)
+Browser  ─  DA3/src/services/api.ts  (abort-signal timeout + envelope parsing)
               │
 Express  ─  routes → controllers → services → config/{db,neo4j}
               │                                    │
@@ -72,7 +72,7 @@ Neo4j    ─  15 nodes / 26 relationships     ◄──────── projec
 
 ## 3. Data model
 
-### 3.1 MySQL (`DA2/database/schema.sql`)
+### 3.1 MySQL (`DA3/database/schema.sql`)
 
 14 InnoDB tables: `passengers`, `passenger_contacts`, `drivers`, `driver_contacts`, `stations`,
 `routes`, `route_stations`, `vehicle_types`, `vehicles`, `trips`, `trip_stops`, `bookings`,
@@ -139,15 +139,15 @@ graph LR
 
 ---
 
-## 4. Setup and run (all commands from inside `DA2/`)
+## 4. Setup and run (all commands from inside `DA3/`)
 
 ### 4.1 Environment
 
-`DA2/.env.example` and `DA2/backend/.env.example` contain placeholders only — copy them and fill in
+`DA3/.env.example` and `DA3/backend/.env.example` contain placeholders only — copy them and fill in
 **your own** credentials; never commit the real values.
 
 ```bash
-cd DA2
+cd DA3
 cp .env.example .env
 cd backend && cp .env.example .env
 ```
@@ -189,12 +189,12 @@ SELECT COUNT(*) FROM bookings;                  # 1
 ### 4.3 Backend and frontend
 
 ```bash
-cd DA2/backend
+cd DA3/backend
 npm install
 npm run dev                                     # http://localhost:5000
 
 # second terminal
-cd DA2
+cd DA3
 npm install
 npm run dev                                     # http://localhost:5173
 ```
@@ -210,7 +210,7 @@ curl http://localhost:5000/api/graph/health     # Neo4j status, or 503 when Neo4
 docker run -d --name transit-neo4j -p 7474:7474 -p 7687:7687 \
   -e NEO4J_AUTH=neo4j/your_neo4j_password neo4j:5-community
 
-cd DA2/backend
+cd DA3/backend
 npm run sync:graph                              # idempotent — safe to re-run
 npm run sync:graph:clean                        # wipe the labels and rebuild from scratch
 curl -X POST http://localhost:5000/api/graph/sync   # same refresh over HTTP
@@ -334,7 +334,7 @@ equal-hop metro express alternative costs 36 km and the endpoint still returns t
    1:1 assignment-collision warning.
 4. **Trips** — schedule CRUD plus a visual stop timeline (`Departed` / `On Time` / `Delayed` / `Scheduled`).
 5. **Bookings** — seat-reservation with collision prevention, UPI/Card/Cash payments, digital boarding pass.
-6. **Graph Explorer** *(new in DA2)* — health bar with per-label node counts, `Check health` and
+6. **Graph Explorer** *(new in DA3)* — health bar with per-label node counts, `Check health` and
    `Sync from MySQL` actions, Features A/B/C panels, and the full `CONNECTS_TO` edge list. Every panel
    has loading, error, empty and success states; when Neo4j is offline it shows an offline banner
    instead of crashing the page.
@@ -343,7 +343,7 @@ equal-hop metro express alternative costs 36 km and the endpoint still returns t
 
 ## 7. Results actually measured
 
-Full detail in `DA2/docs/GRAPH_DATABASE_JUSTIFICATION.md` § 8.
+Full detail in `DA3/docs/GRAPH_DATABASE_JUSTIFICATION.md` § 8.
 
 **Distance optimality, cross-checked against MySQL.** The graph result above (2 hops / 14.5 km) was
 reproduced independently by a recursive CTE on the relational engine, which returned
@@ -406,7 +406,7 @@ edit the email, add a station, sequence it onto a route, create a trip with stop
 checkout, then try to delete a station a route still uses and confirm the `409` guard. Graph Explorer
 must show its offline banner while every table still loads.
 
-**Graph features.** With Neo4j running: `cd DA2/backend && npm run sync:graph`, open **Graph Explorer**
+**Graph features.** With Neo4j running: `cd DA3/backend && npm run sync:graph`, open **Graph Explorer**
 in the sidebar, then (1) trace route `R003`, (2) search `S004 → S003` and read the distance-vs-hop
 comparison, (3) look up passenger `P001`, (4) book a seat in the Bookings module and watch the new
 `:BOOKS` edge appear after the next sync. Delete that booking row in MySQL, sync again, and the stale
@@ -425,6 +425,6 @@ RETURN path
 
 | Document | Path |
 | :--- | :--- |
-| Module-by-module walkthrough, full DDL, TypeScript↔SQL mapping, code walkthrough | `DA2/README.md` |
-| Academic report: problem statement, relational limitations, graph schema, Cypher, comparison, testing, implemented-vs-proposed | `DA2/docs/GRAPH_DATABASE_JUSTIFICATION.md` |
-| Baseline snapshot (pre-iteration state) | `DA1/` |
+| Module-by-module walkthrough, full DDL, TypeScript↔SQL mapping, code walkthrough | `DA3/README.md` |
+| Academic report: problem statement, relational limitations, graph schema, Cypher, comparison, testing, implemented-vs-proposed | `DA3/docs/GRAPH_DATABASE_JUSTIFICATION.md` |
+| Baseline snapshot (pre-iteration state) | `DA2/` |

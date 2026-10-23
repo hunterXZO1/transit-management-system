@@ -1,21 +1,35 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
-  ActiveTab,
-  Booking,
-  Driver,
   Passenger,
-  Payment,
   Route,
-  RouteStation,
   Station,
-  Ticket,
-  ToastNotification,
+  RouteStation,
+  VehicleType,
+  Driver,
+  Vehicle,
   Trip,
   TripStop,
-  Vehicle,
-  VehicleType,
+  Booking,
+  Payment,
+  Ticket,
+  ActiveTab,
+  ToastNotification,
 } from '../types/transit';
-import { ApiError, crud } from '../services/api';
+import {
+  INITIAL_PASSENGERS,
+  INITIAL_ROUTES,
+  INITIAL_STATIONS,
+  INITIAL_ROUTE_STATIONS,
+  INITIAL_VEHICLE_TYPES,
+  INITIAL_DRIVERS,
+  INITIAL_VEHICLES,
+  INITIAL_TRIPS,
+  INITIAL_TRIP_STOPS,
+  INITIAL_BOOKINGS,
+  INITIAL_PAYMENTS,
+  INITIAL_TICKETS,
+} from '../services/mockData';
+import { STORAGE_KEYS, StorageService } from '../services/api';
 
 interface TransitContextType {
   // Navigation & Global UI
@@ -27,13 +41,7 @@ interface TransitContextType {
   addToast: (type: ToastNotification['type'], title: string, message: string) => void;
   removeToast: (id: string) => void;
 
-  // Live API state
-  loading: boolean;
-  busy: boolean;
-  apiError: string | null;
-  reload: () => Promise<void>;
-
-  // Entities (read from MySQL through the Express API)
+  // Entities
   passengers: Passenger[];
   routes: Route[];
   stations: Station[];
@@ -48,516 +56,467 @@ interface TransitContextType {
   tickets: Ticket[];
 
   // Passenger CRUD
-  addPassenger: (passenger: Passenger) => Promise<boolean>;
-  updatePassenger: (passenger: Passenger) => Promise<boolean>;
-  deletePassenger: (passengerId: string) => Promise<boolean>;
+  addPassenger: (passenger: Passenger) => boolean;
+  updatePassenger: (passenger: Passenger) => boolean;
+  deletePassenger: (passengerId: string) => void;
 
   // Route CRUD
-  addRoute: (route: Route) => Promise<boolean>;
-  updateRoute: (route: Route) => Promise<boolean>;
-  deleteRoute: (routeId: string) => Promise<boolean>;
+  addRoute: (route: Route) => boolean;
+  updateRoute: (route: Route) => boolean;
+  deleteRoute: (routeId: string) => void;
 
   // Station CRUD
-  addStation: (station: Station) => Promise<boolean>;
-  updateStation: (station: Station) => Promise<boolean>;
-  deleteStation: (stationId: string) => Promise<boolean>;
+  addStation: (station: Station) => boolean;
+  updateStation: (station: Station) => boolean;
+  deleteStation: (stationId: string) => void;
 
   // RouteStation M:N
-  addRouteStation: (routeStation: RouteStation) => Promise<boolean>;
-  updateRouteStation: (routeStation: RouteStation) => Promise<boolean>;
-  deleteRouteStation: (id: string) => Promise<boolean>;
-  reorderRouteStations: (routeId: string, orderedStationIds: string[]) => Promise<boolean>;
+  addRouteStation: (routeStation: RouteStation) => void;
+  updateRouteStation: (routeStation: RouteStation) => void;
+  deleteRouteStation: (id: string) => void;
+  reorderRouteStations: (routeId: string, orderedStationIds: string[]) => void;
 
   // Fleet CRUD
-  addVehicleType: (type: VehicleType) => Promise<boolean>;
-  updateVehicleType: (type: VehicleType) => Promise<boolean>;
-  deleteVehicleType: (typeId: string) => Promise<boolean>;
+  addVehicleType: (type: VehicleType) => boolean;
+  updateVehicleType: (type: VehicleType) => boolean;
+  deleteVehicleType: (typeId: string) => void;
 
-  addDriver: (driver: Driver) => Promise<boolean>;
-  updateDriver: (driver: Driver) => Promise<boolean>;
-  deleteDriver: (driverId: string) => Promise<boolean>;
+  addDriver: (driver: Driver) => boolean;
+  updateDriver: (driver: Driver) => boolean;
+  deleteDriver: (driverId: string) => void;
 
-  addVehicle: (vehicle: Vehicle) => Promise<boolean>;
-  updateVehicle: (vehicle: Vehicle) => Promise<boolean>;
-  deleteVehicle: (vehicleId: string) => Promise<boolean>;
+  addVehicle: (vehicle: Vehicle) => boolean;
+  updateVehicle: (vehicle: Vehicle) => boolean;
+  deleteVehicle: (vehicleId: string) => void;
 
   // Trip & Stops CRUD
-  addTrip: (trip: Trip, stops?: Omit<TripStop, 'tripId' | 'id'>[]) => Promise<boolean>;
-  updateTrip: (trip: Trip) => Promise<boolean>;
-  deleteTrip: (tripId: string) => Promise<boolean>;
+  addTrip: (trip: Trip) => boolean;
+  updateTrip: (trip: Trip) => boolean;
+  deleteTrip: (tripId: string) => void;
 
-  addTripStop: (stop: TripStop) => Promise<boolean>;
-  updateTripStop: (stop: TripStop) => Promise<boolean>;
-  deleteTripStop: (stopId: string) => Promise<boolean>;
+  addTripStop: (stop: TripStop) => boolean;
+  updateTripStop: (stop: TripStop) => boolean;
+  deleteTripStop: (stopId: string) => void;
 
   // Booking, Payment & Ticket CRUD
-  addBooking: (booking: Booking) => Promise<boolean>;
-  updateBooking: (booking: Booking) => Promise<boolean>;
-  deleteBooking: (bookingId: string) => Promise<boolean>;
-  checkoutBooking: (
-    booking: Booking,
-    ticketDetails: { ticketType: Ticket['ticketType']; travelClass: Ticket['travelClass']; amount: number; paymentMode: Payment['mode'] }
-  ) => Promise<boolean>;
+  addBooking: (booking: Booking) => boolean;
+  updateBooking: (booking: Booking) => boolean;
+  deleteBooking: (bookingId: string) => void;
 
-  addPayment: (payment: Payment) => Promise<boolean>;
-  updatePayment: (payment: Payment) => Promise<boolean>;
-  deletePayment: (paymentId: string) => Promise<boolean>;
+  addPayment: (payment: Payment) => boolean;
+  updatePayment: (payment: Payment) => boolean;
+  deletePayment: (paymentId: string) => void;
 
-  addTicket: (ticket: Ticket) => Promise<boolean>;
-  updateTicket: (ticket: Ticket) => Promise<boolean>;
-  deleteTicket: (ticketId: string) => Promise<boolean>;
+  addTicket: (ticket: Ticket) => boolean;
+  updateTicket: (ticket: Ticket) => boolean;
+  deleteTicket: (ticketId: string) => void;
 
   // System Utility
+  resetToMockData: () => void;
   exportStateToJson: () => void;
 }
 
 const TransitContext = createContext<TransitContextType | undefined>(undefined);
 
-const errorMessage = (err: unknown) =>
-  err instanceof ApiError ? err.message : 'Unexpected error while contacting the server.';
-
 export const TransitProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Navigation & Global UI State
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const [globalSearch, setGlobalSearch] = useState<string>('');
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
 
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [apiError, setApiError] = useState<string | null>(null);
-
-  const [passengers, setPassengers] = useState<Passenger[]>([]);
-  const [routes, setRoutes] = useState<Route[]>([]);
-  const [stations, setStations] = useState<Station[]>([]);
-  const [routeStations, setRouteStations] = useState<RouteStation[]>([]);
-  const [vehicleTypes, setVehicleTypes] = useState<VehicleType[]>([]);
-  const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [trips, setTrips] = useState<Trip[]>([]);
-  const [tripStops, setTripStops] = useState<TripStop[]>([]);
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [tickets, setTickets] = useState<Ticket[]>([]);
-
-  const addToast = useCallback((type: ToastNotification['type'], title: string, message: string) => {
-    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-    setToasts((prev) => [...prev, { id, type, title, message }]);
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4500);
-  }, []);
-
-  const removeToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  }, []);
-
-  const loadAll = useCallback(async () => {
-    setLoading(true);
-    setApiError(null);
-    const tables: { name: string; load: () => Promise<unknown>; apply: (rows: never[]) => void }[] = [
-      { name: 'Passengers', load: crud.passengers.list, apply: setPassengers },
-      { name: 'Routes', load: crud.routes.list, apply: setRoutes },
-      { name: 'Stations', load: crud.stations.list, apply: setStations },
-      { name: 'Route stops', load: crud.routeStations.list, apply: setRouteStations },
-      { name: 'Vehicle types', load: crud.vehicleTypes.list, apply: setVehicleTypes },
-      { name: 'Drivers', load: crud.drivers.list, apply: setDrivers },
-      { name: 'Vehicles', load: crud.vehicles.list, apply: setVehicles },
-      { name: 'Trips', load: crud.trips.list, apply: setTrips },
-      { name: 'Trip stops', load: crud.tripStops.list, apply: setTripStops },
-      { name: 'Bookings', load: crud.bookings.list, apply: setBookings },
-      { name: 'Payments', load: crud.payments.list, apply: setPayments },
-      { name: 'Tickets', load: crud.tickets.list, apply: setTickets },
-    ];
-
-    const results = await Promise.allSettled(tables.map((t) => t.load()));
-    const failures: string[] = [];
-    results.forEach((result, index) => {
-      if (result.status === 'fulfilled') {
-        tables[index].apply(result.value as never[]);
-      } else {
-        failures.push(`${tables[index].name}: ${errorMessage(result.reason)}`);
-      }
-    });
-
-    if (failures.length) {
-      setApiError(failures[0]);
-      addToast('error', 'Could not load from MySQL', failures[0]);
-    }
-    setLoading(false);
-  }, [addToast]);
-
-  useEffect(() => {
-    loadAll();
-  }, [loadAll]);
-
-  // Wraps a write so every call gets a spinner, a toast, and a boolean result.
-  const mutate = useCallback(
-    async (
-      op: () => Promise<unknown>,
-      success: () => void,
-      toast: { type: ToastNotification['type']; title: string; message: string }
-    ): Promise<boolean> => {
-      setBusy(true);
-      try {
-        await op();
-        success();
-        addToast(toast.type, toast.title, toast.message);
-        return true;
-      } catch (err) {
-        addToast('error', 'Operation failed', errorMessage(err));
-        return false;
-      } finally {
-        setBusy(false);
-      }
-    },
-    [addToast]
+  // Entities initialized from localStorage or seed mockData
+  const [passengers, setPassengers] = useState<Passenger[]>(() =>
+    StorageService.get(STORAGE_KEYS.PASSENGERS, INITIAL_PASSENGERS)
+  );
+  const [routes, setRoutes] = useState<Route[]>(() =>
+    StorageService.get(STORAGE_KEYS.ROUTES, INITIAL_ROUTES)
+  );
+  const [stations, setStations] = useState<Station[]>(() =>
+    StorageService.get(STORAGE_KEYS.STATIONS, INITIAL_STATIONS)
+  );
+  const [routeStations, setRouteStations] = useState<RouteStation[]>(() =>
+    StorageService.get(STORAGE_KEYS.ROUTE_STATIONS, INITIAL_ROUTE_STATIONS)
+  );
+  const [vehicleTypes, setVehicleTypes] = useState<VehicleType[]>(() =>
+    StorageService.get(STORAGE_KEYS.VEHICLE_TYPES, INITIAL_VEHICLE_TYPES)
+  );
+  const [drivers, setDrivers] = useState<Driver[]>(() =>
+    StorageService.get(STORAGE_KEYS.DRIVERS, INITIAL_DRIVERS)
+  );
+  const [vehicles, setVehicles] = useState<Vehicle[]>(() =>
+    StorageService.get(STORAGE_KEYS.VEHICLES, INITIAL_VEHICLES)
+  );
+  const [trips, setTrips] = useState<Trip[]>(() =>
+    StorageService.get(STORAGE_KEYS.TRIPS, INITIAL_TRIPS)
+  );
+  const [tripStops, setTripStops] = useState<TripStop[]>(() =>
+    StorageService.get(STORAGE_KEYS.TRIP_STOPS, INITIAL_TRIP_STOPS)
+  );
+  const [bookings, setBookings] = useState<Booking[]>(() =>
+    StorageService.get(STORAGE_KEYS.BOOKINGS, INITIAL_BOOKINGS)
+  );
+  const [payments, setPayments] = useState<Payment[]>(() =>
+    StorageService.get(STORAGE_KEYS.PAYMENTS, INITIAL_PAYMENTS)
+  );
+  const [tickets, setTickets] = useState<Ticket[]>(() =>
+    StorageService.get(STORAGE_KEYS.TICKETS, INITIAL_TICKETS)
   );
 
-  // ---- Passenger ----
-  const addPassenger = (item: Passenger) =>
-    mutate(
-      () => crud.passengers.create(item),
-      () => setPassengers((prev) => [item, ...prev]),
-      { type: 'success', title: 'Passenger Created', message: `${item.firstName} ${item.lastName} saved to MySQL` }
-    );
+  // Sync to localStorage
+  useEffect(() => StorageService.set(STORAGE_KEYS.PASSENGERS, passengers), [passengers]);
+  useEffect(() => StorageService.set(STORAGE_KEYS.ROUTES, routes), [routes]);
+  useEffect(() => StorageService.set(STORAGE_KEYS.STATIONS, stations), [stations]);
+  useEffect(() => StorageService.set(STORAGE_KEYS.ROUTE_STATIONS, routeStations), [routeStations]);
+  useEffect(() => StorageService.set(STORAGE_KEYS.VEHICLE_TYPES, vehicleTypes), [vehicleTypes]);
+  useEffect(() => StorageService.set(STORAGE_KEYS.DRIVERS, drivers), [drivers]);
+  useEffect(() => StorageService.set(STORAGE_KEYS.VEHICLES, vehicles), [vehicles]);
+  useEffect(() => StorageService.set(STORAGE_KEYS.TRIPS, trips), [trips]);
+  useEffect(() => StorageService.set(STORAGE_KEYS.TRIP_STOPS, tripStops), [tripStops]);
+  useEffect(() => StorageService.set(STORAGE_KEYS.BOOKINGS, bookings), [bookings]);
+  useEffect(() => StorageService.set(STORAGE_KEYS.PAYMENTS, payments), [payments]);
+  useEffect(() => StorageService.set(STORAGE_KEYS.TICKETS, tickets), [tickets]);
 
-  const updatePassenger = (item: Passenger) =>
-    mutate(
-      () => crud.passengers.update(item.passengerId, item),
-      () => setPassengers((prev) => prev.map((p) => (p.passengerId === item.passengerId ? item : p))),
-      { type: 'info', title: 'Passenger Updated', message: `Record for ${item.firstName} ${item.lastName} saved` }
-    );
-
-  const deletePassenger = (id: string) =>
-    mutate(
-      () => crud.passengers.remove(id),
-      () => {
-        setPassengers((prev) => prev.filter((p) => p.passengerId !== id));
-        setBookings((prev) => prev.filter((b) => b.passengerId !== id));
-      },
-      { type: 'warning', title: 'Passenger Deleted', message: `Passenger ${id} removed` }
-    );
-
-  // ---- Route ----
-  const addRoute = (item: Route) =>
-    mutate(
-      () => crud.routes.create(item),
-      () => setRoutes((prev) => [item, ...prev]),
-      { type: 'success', title: 'Route Added', message: `Route ${item.name} (${item.routeId}) created` }
-    );
-
-  const updateRoute = (item: Route) =>
-    mutate(
-      () => crud.routes.update(item.routeId, item),
-      () => setRoutes((prev) => prev.map((r) => (r.routeId === item.routeId ? item : r))),
-      { type: 'info', title: 'Route Updated', message: `Route ${item.name} saved` }
-    );
-
-  const deleteRoute = (id: string) =>
-    mutate(
-      () => crud.routes.remove(id),
-      () => {
-        setRoutes((prev) => prev.filter((r) => r.routeId !== id));
-        setRouteStations((prev) => prev.filter((rs) => rs.routeId !== id));
-        setTrips((prev) => prev.filter((t) => t.routeId !== id));
-      },
-      { type: 'warning', title: 'Route Deleted', message: `Route ${id} removed` }
-    );
-
-  // ---- Station ----
-  const addStation = (item: Station) =>
-    mutate(
-      () => crud.stations.create(item),
-      () => setStations((prev) => [item, ...prev]),
-      { type: 'success', title: 'Station Added', message: `${item.name} saved to MySQL` }
-    );
-
-  const updateStation = (item: Station) =>
-    mutate(
-      () => crud.stations.update(item.stationId, item),
-      () => setStations((prev) => prev.map((s) => (s.stationId === item.stationId ? item : s))),
-      { type: 'info', title: 'Station Updated', message: `Station ${item.name} saved` }
-    );
-
-  const deleteStation = (id: string) =>
-    mutate(
-      () => crud.stations.remove(id),
-      () => {
-        setStations((prev) => prev.filter((s) => s.stationId !== id));
-        setRouteStations((prev) => prev.filter((rs) => rs.stationId !== id));
-        setTripStops((prev) => prev.filter((ts) => ts.stationId !== id));
-      },
-      { type: 'warning', title: 'Station Deleted', message: `Station ${id} removed` }
-    );
-
-  // ---- Route <-> Station mapping ----
-  const addRouteStation = (item: RouteStation) =>
-    mutate(
-      () => crud.routeStations.create(item),
-      () => setRouteStations((prev) => [...prev, item]),
-      { type: 'success', title: 'Stop Added', message: `Station added to route order` }
-    );
-
-  const updateRouteStation = (item: RouteStation) =>
-    mutate(
-      () => crud.routeStations.update(item.id, item),
-      () => setRouteStations((prev) => prev.map((rs) => (rs.id === item.id ? item : rs))),
-      { type: 'info', title: 'Stop Updated', message: `Stop sequence saved` }
-    );
-
-  const deleteRouteStation = (id: string) =>
-    mutate(
-      () => crud.routeStations.remove(id),
-      () => setRouteStations((prev) => prev.filter((rs) => rs.id !== id)),
-      { type: 'info', title: 'Stop Removed', message: `Station decoupled from route` }
-    );
-
-  const reorderRouteStations = async (routeId: string, orderedStationIds: string[]) => {
-    setBusy(true);
-    try {
-      const result = await crud.routes.reorder(routeId, orderedStationIds);
-      setRouteStations((prev) => [...prev.filter((rs) => rs.routeId !== routeId), ...result.stops]);
-      addToast('success', 'Sequence Updated', `Stop order saved for ${routeId}`);
-      return true;
-    } catch (err) {
-      addToast('error', 'Operation failed', errorMessage(err));
-      return false;
-    } finally {
-      setBusy(false);
-    }
+  // Toast helper
+  const addToast = (type: ToastNotification['type'], title: string, message: string) => {
+    const id = Date.now().toString() + Math.random().toString(36).substring(2, 5);
+    setToasts((prev) => [...prev, { id, type, title, message }]);
+    setTimeout(() => {
+      removeToast(id);
+    }, 4000);
   };
 
-  // ---- Fleet ----
-  const addVehicleType = (item: VehicleType) =>
-    mutate(
-      () => crud.vehicleTypes.create(item),
-      () => setVehicleTypes((prev) => [item, ...prev]),
-      { type: 'success', title: 'Vehicle Type Added', message: `${item.name} registered` }
-    );
+  const removeToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
 
-  const updateVehicleType = (item: VehicleType) =>
-    mutate(
-      () => crud.vehicleTypes.update(item.typeId, item),
-      () => setVehicleTypes((prev) => prev.map((vt) => (vt.typeId === item.typeId ? item : vt))),
-      { type: 'info', title: 'Vehicle Type Updated', message: `${item.name} saved` }
-    );
+  // Passenger Handlers
+  const addPassenger = (item: Passenger) => {
+    if (passengers.some((p) => p.passengerId.toLowerCase() === item.passengerId.toLowerCase())) {
+      addToast('error', 'Duplicate ID', `Passenger ID ${item.passengerId} already exists`);
+      return false;
+    }
+    setPassengers((prev) => [item, ...prev]);
+    addToast('success', 'Passenger Created', `${item.firstName} ${item.lastName} has been enrolled`);
+    return true;
+  };
 
-  const deleteVehicleType = (id: string) =>
-    mutate(
-      () => crud.vehicleTypes.remove(id),
-      () => setVehicleTypes((prev) => prev.filter((vt) => vt.typeId !== id)),
-      { type: 'warning', title: 'Type Removed', message: `Vehicle Type ${id} deleted` }
-    );
+  const updatePassenger = (item: Passenger) => {
+    setPassengers((prev) => prev.map((p) => (p.passengerId === item.passengerId ? item : p)));
+    addToast('info', 'Passenger Updated', `Record for ${item.firstName} ${item.lastName} updated`);
+    return true;
+  };
 
-  const addDriver = (item: Driver) =>
-    mutate(
-      () => crud.drivers.create(item),
-      () => setDrivers((prev) => [item, ...prev]),
-      { type: 'success', title: 'Driver Added', message: `${item.name} enrolled` }
-    );
+  const deletePassenger = (id: string) => {
+    setPassengers((prev) => prev.filter((p) => p.passengerId !== id));
+    addToast('warning', 'Passenger Deleted', `Passenger ${id} removed`);
+  };
 
-  const updateDriver = (item: Driver) =>
-    mutate(
-      () => crud.drivers.update(item.driverId, item),
-      () => setDrivers((prev) => prev.map((d) => (d.driverId === item.driverId ? item : d))),
-      { type: 'info', title: 'Driver Updated', message: `Driver ${item.name} saved` }
-    );
+  // Route Handlers
+  const addRoute = (item: Route) => {
+    if (routes.some((r) => r.routeId.toLowerCase() === item.routeId.toLowerCase())) {
+      addToast('error', 'Duplicate Route ID', `Route ID ${item.routeId} already exists`);
+      return false;
+    }
+    setRoutes((prev) => [item, ...prev]);
+    addToast('success', 'Route Added', `Route ${item.name} (${item.routeId}) created`);
+    return true;
+  };
 
-  const deleteDriver = (id: string) =>
-    mutate(
-      () => crud.drivers.remove(id),
-      () => {
-        setDrivers((prev) => prev.filter((d) => d.driverId !== id));
-        setVehicles((prev) => prev.map((v) => (v.assignedDriverId === id ? { ...v, assignedDriverId: null } : v)));
-      },
-      { type: 'warning', title: 'Driver Removed', message: `Driver ${id} deleted` }
-    );
+  const updateRoute = (item: Route) => {
+    setRoutes((prev) => prev.map((r) => (r.routeId === item.routeId ? item : r)));
+    addToast('info', 'Route Updated', `Route ${item.name} updated`);
+    return true;
+  };
 
-  const addVehicle = (item: Vehicle) =>
-    mutate(
-      () => crud.vehicles.create(item),
-      () => setVehicles((prev) => [item, ...prev]),
-      { type: 'success', title: 'Vehicle Added', message: `Vehicle ${item.registrationNo} registered` }
-    );
+  const deleteRoute = (id: string) => {
+    setRoutes((prev) => prev.filter((r) => r.routeId !== id));
+    setRouteStations((prev) => prev.filter((rs) => rs.routeId !== id));
+    addToast('warning', 'Route Deleted', `Route ${id} and associated station links removed`);
+  };
 
-  const updateVehicle = (item: Vehicle) =>
-    mutate(
-      () => crud.vehicles.update(item.vehicleId, item),
-      () => {
-        setVehicles((prev) =>
-          prev.map((v) => {
-            if (v.vehicleId === item.vehicleId) return item;
-            if (item.assignedDriverId && v.assignedDriverId === item.assignedDriverId) {
-              return { ...v, assignedDriverId: null };
-            }
-            return v;
-          })
+  // Station Handlers
+  const addStation = (item: Station) => {
+    if (stations.some((s) => s.stationId.toLowerCase() === item.stationId.toLowerCase())) {
+      addToast('error', 'Duplicate Station ID', `Station ID ${item.stationId} already exists`);
+      return false;
+    }
+    setStations((prev) => [item, ...prev]);
+    addToast('success', 'Station Added', `${item.name} added`);
+    return true;
+  };
+
+  const updateStation = (item: Station) => {
+    setStations((prev) => prev.map((s) => (s.stationId === item.stationId ? item : s)));
+    addToast('info', 'Station Updated', `Station ${item.name} updated`);
+    return true;
+  };
+
+  const deleteStation = (id: string) => {
+    setStations((prev) => prev.filter((s) => s.stationId !== id));
+    setRouteStations((prev) => prev.filter((rs) => rs.stationId !== id));
+    addToast('warning', 'Station Deleted', `Station ${id} removed`);
+  };
+
+  // RouteStation M:N Handlers
+  const addRouteStation = (item: RouteStation) => {
+    setRouteStations((prev) => [...prev, item]);
+    addToast('success', 'Stop Added', `Station added to route order`);
+  };
+
+  const updateRouteStation = (item: RouteStation) => {
+    setRouteStations((prev) => prev.map((rs) => (rs.id === item.id ? item : rs)));
+    addToast('info', 'Stop Updated', `Stop sequence updated`);
+  };
+
+  const deleteRouteStation = (id: string) => {
+    setRouteStations((prev) => prev.filter((rs) => rs.id !== id));
+    addToast('info', 'Stop Removed', `Station decoupled from route`);
+  };
+
+  const reorderRouteStations = (routeId: string, orderedStationIds: string[]) => {
+    setRouteStations((prev) => {
+      const otherRouteStations = prev.filter((rs) => rs.routeId !== routeId);
+      const newEntries: RouteStation[] = orderedStationIds.map((stId, index) => {
+        const existing = prev.find((rs) => rs.routeId === routeId && rs.stationId === stId);
+        return {
+          id: existing ? existing.id : `${routeId}-${stId}-${index + 1}`,
+          routeId,
+          stationId: stId,
+          stopOrder: index + 1,
+          distanceFromStartKm: existing?.distanceFromStartKm ?? index * 5,
+        };
+      });
+      return [...otherRouteStations, ...newEntries];
+    });
+    addToast('success', 'Sequence Updated', `Station stop order updated for ${routeId}`);
+  };
+
+  // Fleet Handlers
+  const addVehicleType = (item: VehicleType) => {
+    if (vehicleTypes.some((vt) => vt.typeId.toLowerCase() === item.typeId.toLowerCase())) {
+      addToast('error', 'Duplicate ID', `Type ID ${item.typeId} already exists`);
+      return false;
+    }
+    setVehicleTypes((prev) => [item, ...prev]);
+    addToast('success', 'Vehicle Type Added', `${item.name} registered`);
+    return true;
+  };
+
+  const updateVehicleType = (item: VehicleType) => {
+    setVehicleTypes((prev) => prev.map((vt) => (vt.typeId === item.typeId ? item : vt)));
+    addToast('info', 'Vehicle Type Updated', `${item.name} updated`);
+    return true;
+  };
+
+  const deleteVehicleType = (id: string) => {
+    setVehicleTypes((prev) => prev.filter((vt) => vt.typeId !== id));
+    addToast('warning', 'Type Removed', `Vehicle Type ${id} deleted`);
+  };
+
+  const addDriver = (item: Driver) => {
+    if (drivers.some((d) => d.driverId.toLowerCase() === item.driverId.toLowerCase())) {
+      addToast('error', 'Duplicate ID', `Driver ID ${item.driverId} already exists`);
+      return false;
+    }
+    setDrivers((prev) => [item, ...prev]);
+    addToast('success', 'Driver Added', `${item.name} enrolled`);
+    return true;
+  };
+
+  const updateDriver = (item: Driver) => {
+    setDrivers((prev) => prev.map((d) => (d.driverId === item.driverId ? item : d)));
+    addToast('info', 'Driver Updated', `Driver ${item.name} updated`);
+    return true;
+  };
+
+  const deleteDriver = (id: string) => {
+    setDrivers((prev) => prev.filter((d) => d.driverId !== id));
+    // Clear vehicle assignment if assigned
+    setVehicles((prev) =>
+      prev.map((v) => (v.assignedDriverId === id ? { ...v, assignedDriverId: null } : v))
+    );
+    addToast('warning', 'Driver Removed', `Driver ${id} deleted and vehicle unassigned`);
+  };
+
+  const addVehicle = (item: Vehicle) => {
+    if (vehicles.some((v) => v.vehicleId.toLowerCase() === item.vehicleId.toLowerCase())) {
+      addToast('error', 'Duplicate ID', `Vehicle ID ${item.vehicleId} already exists`);
+      return false;
+    }
+    // Check 1:1 driver assignment constraint
+    if (item.assignedDriverId) {
+      const alreadyAssigned = vehicles.find(
+        (v) => v.assignedDriverId === item.assignedDriverId && v.vehicleId !== item.vehicleId
+      );
+      if (alreadyAssigned) {
+        addToast(
+          'warning',
+          'Driver Reassigned',
+          `Driver ${item.assignedDriverId} was previously assigned to ${alreadyAssigned.vehicleId}`
         );
-      },
-      { type: 'info', title: 'Vehicle Updated', message: `Vehicle ${item.registrationNo} saved` }
-    );
-
-  const deleteVehicle = (id: string) =>
-    mutate(
-      () => crud.vehicles.remove(id),
-      () => setVehicles((prev) => prev.filter((v) => v.vehicleId !== id)),
-      { type: 'warning', title: 'Vehicle Removed', message: `Vehicle ${id} deleted` }
-    );
-
-  // ---- Trips ----
-  const addTrip = (trip: Trip, stops: Omit<TripStop, 'tripId' | 'id'>[] = []) =>
-    mutate(
-      () => crud.trips.create(trip, stops),
-      () => {
-        setTrips((prev) => [trip, ...prev]);
-        if (stops.length) {
-          setTripStops((prev) => [
-            ...prev,
-            ...stops.map((s) => ({ ...s, id: `${trip.tripId}-${s.stationId}-${s.stopOrder}`, tripId: trip.tripId })),
-          ]);
-        }
-      },
-      {
-        type: 'success',
-        title: 'Trip Scheduled',
-        message: stops.length ? `Trip ${trip.tripId} created with ${stops.length} stops` : `Trip ${trip.tripId} created`,
       }
-    );
-
-  const updateTrip = (item: Trip) =>
-    mutate(
-      () => crud.trips.update(item.tripId, item),
-      () => setTrips((prev) => prev.map((t) => (t.tripId === item.tripId ? item : t))),
-      { type: 'info', title: 'Trip Updated', message: `Trip ${item.tripId} saved` }
-    );
-
-  const deleteTrip = (id: string) =>
-    mutate(
-      () => crud.trips.remove(id),
-      () => {
-        setTrips((prev) => prev.filter((t) => t.tripId !== id));
-        setTripStops((prev) => prev.filter((ts) => ts.tripId !== id));
-        setBookings((prev) => prev.filter((b) => b.tripId !== id));
-      },
-      { type: 'warning', title: 'Trip Deleted', message: `Trip ${id} removed` }
-    );
-
-  const addTripStop = (item: TripStop) =>
-    mutate(
-      () => crud.tripStops.create(item),
-      () => setTripStops((prev) => [...prev, item]),
-      { type: 'success', title: 'Stop Added', message: `Station stop attached to trip` }
-    );
-
-  const updateTripStop = (item: TripStop) =>
-    mutate(
-      () => crud.tripStops.update(item.id, item),
-      () => setTripStops((prev) => prev.map((ts) => (ts.id === item.id ? item : ts))),
-      { type: 'info', title: 'Stop Updated', message: `Arrival/departure times saved` }
-    );
-
-  const deleteTripStop = (id: string) =>
-    mutate(
-      () => crud.tripStops.remove(id),
-      () => setTripStops((prev) => prev.filter((ts) => ts.id !== id)),
-      { type: 'info', title: 'Stop Removed', message: `Stop removed from trip schedule` }
-    );
-
-  // ---- Bookings, payments, tickets ----
-  const addBooking = (item: Booking) =>
-    mutate(
-      () => crud.bookings.create(item),
-      () => setBookings((prev) => [item, ...prev]),
-      { type: 'success', title: 'Booking Confirmed', message: `Seat ${item.seatNumber} booked` }
-    );
-
-  const updateBooking = (item: Booking) =>
-    mutate(
-      () => crud.bookings.update(item.bookingId, item),
-      () => setBookings((prev) => prev.map((b) => (b.bookingId === item.bookingId ? item : b))),
-      { type: 'info', title: 'Booking Updated', message: `Booking ${item.bookingId} saved` }
-    );
-
-  const deleteBooking = (id: string) =>
-    mutate(
-      () => crud.bookings.remove(id),
-      () => {
-        setBookings((prev) => prev.filter((b) => b.bookingId !== id));
-        setTickets((prev) => prev.filter((t) => t.bookingId !== id));
-      },
-      { type: 'warning', title: 'Booking Cancelled', message: `Booking ${id} deleted` }
-    );
-
-  const checkoutBooking: TransitContextType['checkoutBooking'] = async (booking, details) => {
-    const stamp = Date.now().toString().slice(-6);
-    const payment: Payment = {
-      paymentId: `PAY${stamp}`.slice(0, 20),
-      mode: details.paymentMode,
-      amount: details.amount,
-      date: new Date().toISOString().slice(0, 10),
-      txnReferenceNo: `TXN-${stamp.toUpperCase()}`,
-    };
-    const ticket = {
-      ticketId: `TK${stamp}`.slice(0, 20),
-      issueDate: payment.date,
-      ticketType: details.ticketType,
-      travelClass: details.travelClass,
-    };
-
-    setBusy(true);
-    try {
-      const result = await crud.bookings.checkout({ booking, payment, ticket });
-      setBookings((prev) => [result.booking, ...prev]);
-      if (result.payment) setPayments((prev) => [result.payment as Payment, ...prev]);
-      if (result.ticket) setTickets((prev) => [result.ticket as Ticket, ...prev]);
-      addToast('success', 'Ticket Issued', `Seat ${booking.seatNumber} booked and ticket generated in one transaction`);
-      return true;
-    } catch (err) {
-      addToast('error', 'Booking failed', errorMessage(err));
-      return false;
-    } finally {
-      setBusy(false);
     }
+    setVehicles((prev) => [item, ...prev]);
+    addToast('success', 'Vehicle Added', `Vehicle ${item.registrationNo} registered`);
+    return true;
   };
 
-  const addPayment = (item: Payment) =>
-    mutate(
-      () => crud.payments.create(item),
-      () => setPayments((prev) => [item, ...prev]),
-      { type: 'success', title: 'Payment Recorded', message: `Amount ₹${item.amount.toFixed(2)} via ${item.mode}` }
-    );
+  const updateVehicle = (item: Vehicle) => {
+    if (item.assignedDriverId) {
+      const conflict = vehicles.find(
+        (v) => v.assignedDriverId === item.assignedDriverId && v.vehicleId !== item.vehicleId
+      );
+      if (conflict) {
+        // Unassign from the other vehicle to enforce 1:1 constraint
+        setVehicles((prev) =>
+          prev.map((v) =>
+            v.vehicleId === conflict.vehicleId ? { ...v, assignedDriverId: null } : v
+          )
+        );
+      }
+    }
+    setVehicles((prev) => prev.map((v) => (v.vehicleId === item.vehicleId ? item : v)));
+    addToast('info', 'Vehicle Updated', `Vehicle ${item.registrationNo} updated`);
+    return true;
+  };
 
-  const updatePayment = (item: Payment) =>
-    mutate(
-      () => crud.payments.update(item.paymentId, item),
-      () => setPayments((prev) => prev.map((p) => (p.paymentId === item.paymentId ? item : p))),
-      { type: 'info', title: 'Payment Updated', message: `Payment ${item.paymentId} saved` }
-    );
+  const deleteVehicle = (id: string) => {
+    setVehicles((prev) => prev.filter((v) => v.vehicleId !== id));
+    addToast('warning', 'Vehicle Removed', `Vehicle ${id} deleted`);
+  };
 
-  const deletePayment = (id: string) =>
-    mutate(
-      () => crud.payments.remove(id),
-      () => setPayments((prev) => prev.filter((p) => p.paymentId !== id)),
-      { type: 'warning', title: 'Payment Deleted', message: `Payment record ${id} removed` }
-    );
+  // Trip Handlers
+  const addTrip = (item: Trip) => {
+    if (trips.some((t) => t.tripId.toLowerCase() === item.tripId.toLowerCase())) {
+      addToast('error', 'Duplicate Trip ID', `Trip ID ${item.tripId} already exists`);
+      return false;
+    }
+    setTrips((prev) => [item, ...prev]);
+    addToast('success', 'Trip Scheduled', `Trip ${item.tripId} created`);
+    return true;
+  };
 
-  const addTicket = (item: Ticket) =>
-    mutate(
-      () => crud.tickets.create(item),
-      () => setTickets((prev) => [item, ...prev]),
-      { type: 'success', title: 'Ticket Issued', message: `Ticket ${item.ticketId} generated` }
-    );
+  const updateTrip = (item: Trip) => {
+    setTrips((prev) => prev.map((t) => (t.tripId === item.tripId ? item : t)));
+    addToast('info', 'Trip Updated', `Trip ${item.tripId} modified`);
+    return true;
+  };
 
-  const updateTicket = (item: Ticket) =>
-    mutate(
-      () => crud.tickets.update(item.ticketId, item),
-      () => setTickets((prev) => prev.map((t) => (t.ticketId === item.ticketId ? item : t))),
-      { type: 'info', title: 'Ticket Updated', message: `Ticket ${item.ticketId} saved` }
-    );
+  const deleteTrip = (id: string) => {
+    setTrips((prev) => prev.filter((t) => t.tripId !== id));
+    setTripStops((prev) => prev.filter((ts) => ts.tripId !== id));
+    addToast('warning', 'Trip Deleted', `Trip ${id} and stop timeline removed`);
+  };
 
-  const deleteTicket = (id: string) =>
-    mutate(
-      () => crud.tickets.remove(id),
-      () => setTickets((prev) => prev.filter((t) => t.ticketId !== id)),
-      { type: 'warning', title: 'Ticket Voided', message: `Ticket ${id} removed` }
+  const addTripStop = (item: TripStop) => {
+    setTripStops((prev) => [...prev, item]);
+    addToast('success', 'Stop Added', `Station stop attached to trip`);
+    return true;
+  };
+
+  const updateTripStop = (item: TripStop) => {
+    setTripStops((prev) => prev.map((ts) => (ts.id === item.id ? item : ts)));
+    addToast('info', 'Stop Updated', `Arrival/Departure time updated`);
+    return true;
+  };
+
+  const deleteTripStop = (id: string) => {
+    setTripStops((prev) => prev.filter((ts) => ts.id !== id));
+    addToast('info', 'Stop Removed', `Stop removed from trip schedule`);
+  };
+
+  // Booking, Payment & Ticket Handlers
+  const addBooking = (item: Booking) => {
+    // Collision check: same seat on same trip
+    const conflict = bookings.find(
+      (b) =>
+        b.tripId === item.tripId &&
+        b.seatNumber.toLowerCase() === item.seatNumber.toLowerCase() &&
+        b.status === 'Confirmed'
     );
+    if (conflict) {
+      addToast(
+        'error',
+        'Seat Collision',
+        `Seat ${item.seatNumber} is already occupied on Trip ${item.tripId}`
+      );
+      return false;
+    }
+    setBookings((prev) => [item, ...prev]);
+    addToast('success', 'Booking Confirmed', `Seat ${item.seatNumber} booked for passenger`);
+    return true;
+  };
+
+  const updateBooking = (item: Booking) => {
+    setBookings((prev) => prev.map((b) => (b.bookingId === item.bookingId ? item : b)));
+    addToast('info', 'Booking Updated', `Booking ${item.bookingId} updated`);
+    return true;
+  };
+
+  const deleteBooking = (id: string) => {
+    setBookings((prev) => prev.filter((b) => b.bookingId !== id));
+    addToast('warning', 'Booking Cancelled', `Booking ${id} deleted`);
+  };
+
+  const addPayment = (item: Payment) => {
+    if (payments.some((p) => p.paymentId.toLowerCase() === item.paymentId.toLowerCase())) {
+      addToast('error', 'Duplicate ID', `Payment ID ${item.paymentId} already exists`);
+      return false;
+    }
+    setPayments((prev) => [item, ...prev]);
+    addToast('success', 'Payment Recorded', `Amount $${item.amount.toFixed(2)} via ${item.mode}`);
+    return true;
+  };
+
+  const updatePayment = (item: Payment) => {
+    setPayments((prev) => prev.map((p) => (p.paymentId === item.paymentId ? item : p)));
+    addToast('info', 'Payment Updated', `Payment ${item.paymentId} updated`);
+    return true;
+  };
+
+  const deletePayment = (id: string) => {
+    setPayments((prev) => prev.filter((p) => p.paymentId !== id));
+    addToast('warning', 'Payment Deleted', `Payment record ${id} removed`);
+  };
+
+  const addTicket = (item: Ticket) => {
+    if (tickets.some((tk) => tk.ticketId.toLowerCase() === item.ticketId.toLowerCase())) {
+      addToast('error', 'Duplicate ID', `Ticket ID ${item.ticketId} already exists`);
+      return false;
+    }
+    setTickets((prev) => [item, ...prev]);
+    addToast('success', 'Ticket Issued', `Ticket ${item.ticketId} generated`);
+    return true;
+  };
+
+  const updateTicket = (item: Ticket) => {
+    setTickets((prev) => prev.map((tk) => (tk.ticketId === item.ticketId ? item : tk)));
+    addToast('info', 'Ticket Updated', `Ticket ${item.ticketId} updated`);
+    return true;
+  };
+
+  const deleteTicket = (id: string) => {
+    setTickets((prev) => prev.filter((tk) => tk.ticketId !== id));
+    addToast('warning', 'Ticket Voided', `Ticket ${id} removed`);
+  };
+
+  // Utility actions
+  const resetToMockData = () => {
+    StorageService.clearAll();
+    setPassengers(INITIAL_PASSENGERS);
+    setRoutes(INITIAL_ROUTES);
+    setStations(INITIAL_STATIONS);
+    setRouteStations(INITIAL_ROUTE_STATIONS);
+    setVehicleTypes(INITIAL_VEHICLE_TYPES);
+    setDrivers(INITIAL_DRIVERS);
+    setVehicles(INITIAL_VEHICLES);
+    setTrips(INITIAL_TRIPS);
+    setTripStops(INITIAL_TRIP_STOPS);
+    setBookings(INITIAL_BOOKINGS);
+    setPayments(INITIAL_PAYMENTS);
+    setTickets(INITIAL_TICKETS);
+    addToast('info', 'State Reset', 'System reverted to initial seed mock data');
+  };
 
   const exportStateToJson = () => {
     const backup = {
@@ -579,10 +538,10 @@ export const TransitProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `transitflow_mysql_export_${new Date().toISOString().slice(0, 10)}.json`;
+    link.download = `transitflow_backup_${new Date().toISOString().slice(0, 10)}.json`;
     link.click();
     URL.revokeObjectURL(url);
-    addToast('success', 'Export Complete', 'MySQL tables exported to JSON');
+    addToast('success', 'Export Complete', 'All relational tables exported to JSON');
   };
 
   return (
@@ -595,10 +554,6 @@ export const TransitProvider: React.FC<{ children: React.ReactNode }> = ({ child
         toasts,
         addToast,
         removeToast,
-        loading,
-        busy,
-        apiError,
-        reload: loadAll,
         passengers,
         routes,
         stations,
@@ -642,13 +597,13 @@ export const TransitProvider: React.FC<{ children: React.ReactNode }> = ({ child
         addBooking,
         updateBooking,
         deleteBooking,
-        checkoutBooking,
         addPayment,
         updatePayment,
         deletePayment,
         addTicket,
         updateTicket,
         deleteTicket,
+        resetToMockData,
         exportStateToJson,
       }}
     >
@@ -659,6 +614,8 @@ export const TransitProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
 export const useTransit = () => {
   const context = useContext(TransitContext);
-  if (!context) throw new Error('useTransit must be used within a TransitProvider');
+  if (!context) {
+    throw new Error('useTransit must be used within a TransitProvider');
+  }
   return context;
 };

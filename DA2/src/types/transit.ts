@@ -129,8 +129,7 @@ export type ActiveTab =
   | 'routes'
   | 'fleet'
   | 'trips'
-  | 'bookings'
-  | 'graph';
+  | 'bookings';
 
 // Notification toast
 export interface ToastNotification {

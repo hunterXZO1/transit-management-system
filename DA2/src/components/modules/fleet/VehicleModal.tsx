@@ -7,7 +7,7 @@ import { AlertCircle } from 'lucide-react';
 interface VehicleModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (vehicle: Vehicle) => Promise<boolean>;
+  onSave: (vehicle: Vehicle) => boolean;
   vehicleToEdit?: Vehicle | null;
 }
 
@@ -67,10 +67,10 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-    const success = await onSave(formData);
+    const success = onSave(formData);
     if (success) {
       onClose();
     }

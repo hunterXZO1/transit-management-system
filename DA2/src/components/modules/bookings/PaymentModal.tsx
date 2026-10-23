@@ -5,7 +5,7 @@ import { Modal } from '../../common/Modal';
 interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (payment: Payment) => Promise<boolean>;
+  onSave: (payment: Payment) => boolean;
   paymentToEdit?: Payment | null;
 }
 
@@ -52,10 +52,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-    const success = await onSave(formData);
+    const success = onSave(formData);
     if (success) {
       onClose();
     }

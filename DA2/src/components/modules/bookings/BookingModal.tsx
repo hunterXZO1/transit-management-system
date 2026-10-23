@@ -16,7 +16,7 @@ interface BookingModalProps {
       amount: number;
       paymentMode: PaymentMode;
     }
-  ) => Promise<boolean>;
+  ) => boolean;
   bookingToEdit?: Booking | null;
 }
 
@@ -89,10 +89,10 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-    const success = await onSave(
+    const success = onSave(
       formData,
       autoIssueTicket,
       autoIssueTicket

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Trip } from '../../../types/transit';
+import { Trip, TripStop } from '../../../types/transit';
 import { useTransit } from '../../../context/TransitContext';
 import { DataTable, Column } from '../../common/DataTable';
 import { Badge } from '../../common/Badge';
@@ -17,6 +17,7 @@ export const TripModule: React.FC = () => {
     addTrip,
     updateTrip,
     deleteTrip,
+    addTripStop,
     globalSearch,
   } = useTransit();
 
@@ -25,26 +26,32 @@ export const TripModule: React.FC = () => {
   const [tripToEdit, setTripToEdit] = useState<Trip | null>(null);
   const [deleteTripTarget, setDeleteTripTarget] = useState<Trip | null>(null);
 
-  const handleSaveTrip = async (tripData: Trip, autoGenerateStops: boolean) => {
+  const handleSaveTrip = (tripData: Trip, autoGenerateStops: boolean) => {
     const isEdit = Boolean(tripToEdit);
     let success = false;
     if (isEdit) {
-      success = await updateTrip(tripData);
+      success = updateTrip(tripData);
     } else {
-      // Stops are sent with the trip so the schedule is written in one MySQL transaction.
-      const stops = autoGenerateStops
-        ? routeStations
-            .filter((rs) => rs.routeId === tripData.routeId)
-            .sort((a, b) => a.stopOrder - b.stopOrder)
-            .map((rs, index, all) => ({
-              stationId: rs.stationId,
-              stopOrder: index + 1,
-              arrivalTime: index === 0 ? tripData.startTime : '08:20',
-              departureTime: index === all.length - 1 ? tripData.endTime : '08:25',
-              status: 'Scheduled' as const,
-            }))
-        : [];
-      success = await addTrip(tripData, stops);
+      success = addTrip(tripData);
+      if (success && autoGenerateStops) {
+        // Auto-generate stops based on assigned route's stations
+        const routeStops = routeStations
+          .filter((rs) => rs.routeId === tripData.routeId)
+          .sort((a, b) => a.stopOrder - b.stopOrder);
+
+        routeStops.forEach((rs, index) => {
+          const autoStop: TripStop = {
+            id: `${tripData.tripId}-${rs.stationId}-${index + 1}`,
+            tripId: tripData.tripId,
+            stationId: rs.stationId,
+            stopOrder: index + 1,
+            arrivalTime: index === 0 ? tripData.startTime : '08:20',
+            departureTime: index === routeStops.length - 1 ? tripData.endTime : '08:25',
+            status: 'Scheduled',
+          };
+          addTripStop(autoStop);
+        });
+      }
     }
     if (success) {
       setSelectedTrip(tripData);

@@ -6,7 +6,7 @@ import { MultiInput } from '../../common/MultiInput';
 interface DriverModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (driver: Driver) => Promise<boolean>;
+  onSave: (driver: Driver) => boolean;
   driverToEdit?: Driver | null;
 }
 
@@ -56,10 +56,10 @@ export const DriverModal: React.FC<DriverModalProps> = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-    const success = await onSave(formData);
+    const success = onSave(formData);
     if (success) {
       onClose();
     }

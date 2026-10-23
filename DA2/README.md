@@ -2,9 +2,7 @@
 
 A production-grade, responsive Full-Stack Transit Operations Management System built for **Public Bus and Metro Networks**. 
 
-TransitFlow integrates a high-performance **React 18 + TypeScript** client with an enterprise **Relational SQL Database (MySQL)** via a **Node.js / Express REST API** service layer. It models complex transit relationships including multi-valued phone contacts, M:N route-station topologies, weak-entity trip progress schedules, 1:1 vehicle-driver assignments, and seat collision safeguards.
-
-MySQL remains the **source of truth** for every screen. An **optional Neo4j graph projection**, refreshed by an idempotent sync script, serves multi-hop network analytics (route traces, weighted pathfinding, passenger journeys) that the relational model can only reach through recursive joins. The two engines are complementary: the graph layer is additive, and the application degrades to `503` on graph routes — with CRUD unaffected — whenever Neo4j is offline.
+TransitFlow integrates a high-performance **React 18 + TypeScript** client with an enterprise **Relational SQL Database (MySQL / PostgreSQL)** via a **Node.js / Express REST API** service layer. It models complex transit relationships including multi-valued phone contacts, M:N route-station topologies, weak-entity trip progress schedules, 1:1 vehicle-driver assignments, and seat collision safeguards.
 
 ---
 
@@ -23,54 +21,34 @@ MySQL remains the **source of truth** for every screen. An **optional Neo4j grap
 - [Environment Configuration (`.env`)](#-environment-configuration-env)
 - [Step-by-Step Installation & Run Guide](#-step-by-step-installation--run-guide)
 - [Core Functional Modules](#-core-functional-modules)
-- [REST API Reference](#-rest-api-reference)
-- [How to Test](#-how-to-test)
 - [Relational Integrity & Business Logic](#-relational-integrity--business-logic)
-- [Graph Database Report (Neo4j justification, schema, Cypher, benchmarks)](docs/GRAPH_DATABASE_JUSTIFICATION.md)
 - [License](#-license)
 
 ---
 
 ## 🏛️ System Architecture
 
-TransitFlow employs a decoupled architecture with one write path (MySQL) and one analytical
-read path (Neo4j):
-
-```mermaid
-flowchart LR
-    UI["React 18 + Vite client<br/>(TypeScript, Tailwind, Context API)"]
-    API["Node.js / Express REST API<br/>(CORS, validation, parameterized queries,<br/>transactions, unified error envelope)"]
-    MY[("MySQL — source of truth<br/>14 normalized tables<br/>all website CRUD")]
-    N4[("Neo4j Community<br/>6 node labels, 7 relationship types<br/>graph analytics only")]
-
-    UI -->|"HTTP / JSON  /api/*  (CRUD)"| API
-    API -->|"mysql2 prepared statements + transactions"| MY
-    UI -->|"HTTP / JSON  /api/graph/*"| API
-    API -->|"neo4j-driver sessions, parameterized Cypher"| N4
-    MY -.->|"idempotent projection: sync-mysql-to-neo4j.js"| N4
-```
-
-The same topology as a tier stack:
+TransitFlow employs a 3-tier decoupled architecture designed for scalability, data integrity, and real-time responsiveness:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    React 18 + Vite Client                   │
 │   (TypeScript, Tailwind CSS, Lucide Icons, Context API)     │
 └──────────────────────────────┬──────────────────────────────┘
+                               │
                                │ HTTP / JSON (REST API)
                                ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                   Node.js / Express API                     │
-│  (CORS, request validation, pooling, transactions, errors)  │
-└──────────┬───────────────────────────────────────┬──────────┘
-           │ TCP / prepared SQL                    │ Bolt / parameterized Cypher
-           ▼                                       ▼
-┌──────────────────────────────┐    ┌──────────────────────────┐
-│   Relational Database        │    │  Graph Database          │
-│   MySQL — 14 tables          │───▶│  Neo4j Community         │
-│   source of truth for CRUD   │sync│  route/path/booking      │
-│                              │    │  analytics               │
-└──────────────────────────────┘    └──────────────────────────┘
+│    (CORS, Parameter Validation, Connection Pooling, JWT)    │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                               │ TCP / Prepared SQL Queries
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 Relational Database (SQL)                   │
+│        (MySQL / PostgreSQL - 11 Normalized Tables)          │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -117,74 +95,90 @@ Below is the complete overview of the updated codebase files, categorized by sub
 
 ```
 transit-management-system/
-├── database/
-│   └── schema.sql                           # 14-table relational DDL + demo seed data
-│
-├── docs/
-│   └── GRAPH_DATABASE_JUSTIFICATION.md      # Academic report: MySQL vs Neo4j, what is tested
-│
-├── backend/                                 # Express API service (ESM)
+├── backend/                             # [NEW] SQL Backend Service
 │   ├── config/
-│   │   ├── db.js                            # mysql2/promise pool (dateStrings, decimalNumbers)
-│   │   └── neo4j.js                         # [NEW] singleton driver, runCypher / runCypherTransaction
+│   │   └── db.js                        # MySQL connection pool configuration
 │   ├── controllers/
-│   │   ├── resourceController.js            # Generic CRUD handlers over the resource registry
-│   │   ├── compositeController.js           # Multi-table, transactional endpoints (trip + stops, checkout)
-│   │   └── neo4jTransitController.js        # [NEW] Features A/B/C + graph health, sync, booking demo
+│   │   ├── passengerController.js       # SQL queries for passenger & contact CRUD
+│   │   ├── routeController.js           # Route & station sequencer SQL operations
+│   │   ├── fleetController.js           # Vehicle & driver 1:1 logic queries
+│   │   ├── tripController.js            # Trip and weak-entity TripStop queries
+│   │   └── bookingController.js         # Booking, seat lock, and ticket queries
 │   ├── database/
-│   │   ├── sync-mysql-to-neo4j.js           # [NEW] idempotent CLI projection, prunes deleted rows
-│   │   └── neo4j_seed.cypher                # Earlier hand-written seed (superseded by the sync; kept)
-│   ├── middleware/
-│   │   └── errorHandler.js                  # 404 + unified error envelope
-│   ├── models/
-│   │   └── resourceRegistry.js              # Declarative table/column/FK/reference metadata
+│   │   └── schema.sql                   # Complete relational DDL schema & sample seeds
 │   ├── routes/
-│   │   ├── resourceRoutes.js                # MySQL CRUD routes
-│   │   └── neo4jRoutes.js                   # [NEW] /api/graph/* routes
-│   ├── services/
-│   │   ├── resourceService.js               # Parameterized CRUD, transactions, delete guards
-│   │   ├── compositeService.js              # Atomic trip scheduling + booking checkout
-│   │   └── graphSyncService.js              # [NEW] snapshot → MERGE → prune-stale
-│   ├── utils/
-│   │   ├── fields.js                        # Row ↔ DTO mapping helpers
-│   │   └── http.js                          # ApiError, MySQL + Neo4j error mapping
-│   ├── .env.example                         # Credential template (real .env is gitignored)
-│   ├── package.json                         # express, mysql2, cors, dotenv, neo4j-driver
-│   └── server.js                            # Entry point, /api/health, graceful shutdown
+│   │   └── api.js                       # Express REST API routes mapping
+│   ├── .env.example                     # Backend environment credentials template
+│   ├── package.json                     # Backend dependencies (express, mysql2, cors, dotenv)
+│   └── server.js                        # Express server entry point
 │
-├── src/                                     # Frontend client (React 18 + TypeScript)
+├── src/                                 # Frontend Client (React 18 + TypeScript)
 │   ├── components/
-│   │   ├── common/                          # Badge, ConfirmDialog, DataTable, Modal, MultiInput, Toast
+│   │   ├── common/                      # Reusable UI component library
+│   │   │   ├── Badge.tsx                # Status chips (On Time, Delayed, Metro, Bus, etc.)
+│   │   │   ├── ConfirmDialog.tsx        # Safe deletion confirmation modal
+│   │   │   ├── DataTable.tsx            # Generic sortable, paginated data table
+│   │   │   ├── Modal.tsx                # Backdrop modal wrapper with ESC key dismiss
+│   │   │   ├── MultiInput.tsx           # Dynamic tag adder for 1:N phone numbers
+│   │   │   └── Toast.tsx                # Pop-up notification stack (Success, Error, Info)
 │   │   ├── layout/
-│   │   │   ├── Header.tsx                   # Per-tab title/description + global search
-│   │   │   └── Sidebar.tsx                  # Navigation, including the Graph Explorer entry
+│   │   │   ├── Header.tsx               # Global search input, JSON export & mock reset
+│   │   │   └── Sidebar.tsx              # Modern zinc/slate navigation sidebar
 │   │   └── modules/
-│   │       ├── dashboard/ · passengers/ · routes/ · fleet/ · trips/ · bookings/
-│   │       └── graph/
-│   │           └── GraphExplorer.tsx         # [NEW] health bar, route trace, weighted path, journeys
+│   │       ├── dashboard/
+│   │       │   └── DashboardView.tsx    # Live metric KPI cards, recent activity, system stats
+│   │       ├── passengers/
+│   │       │   ├── PassengerModal.tsx   # Add/Edit passenger modal with contact list editor
+│   │       │   └── PassengerModule.tsx  # Passenger table with contact tags and full search
+│   │       ├── routes/
+│   │       │   ├── RouteModal.tsx       # Route creation (Bus vs Metro)
+│   │       │   ├── StationModal.tsx     # Transit stop creation modal
+│   │       │   ├── RouteStationMapperModal.tsx # Interactive stop sequencing & distance tool
+│   │       │   └── RouteModule.tsx      # Dual tabs for routes, stations & route mapping
+│   │       ├── fleet/
+│   │       │   ├── VehicleTypeModal.tsx # Vehicle classification & capacity setup
+│   │       │   ├── DriverModal.tsx      # Driver registry & multi-contact phone input
+│   │       │   ├── VehicleModal.tsx     # Vehicle registry with 1:1 driver assignment check
+│   │       │   └── FleetModule.tsx      # Fleet management dashboard (Vehicles, Drivers, Types)
+│   │       ├── trips/
+│   │       │   ├── TripModal.tsx        # Schedule run modal with route & vehicle picker
+│   │       │   ├── TripStopModal.tsx    # Add intermediate station stop with arrival/departure
+│   │       │   ├── TripTimeline.tsx     # Step-by-step graphical run progression timeline
+│   │       │   └── TripModule.tsx       # Scheduling coordinator with live timeline inspect
+│   │       └── bookings/
+│   │           ├── BookingModal.tsx     # Passenger seat booking with duplicate seat blocker
+│   │           ├── PaymentModal.tsx     # Payment transaction modal (UPI, Card, Cash)
+│   │           ├── TicketCardModal.tsx  # Printable Digital Boarding Pass with QR code
+│   │           └── BookingModule.tsx    # Master booking, ticketing, and revenue tabs
+│   │
 │   ├── context/
-│   │   └── TransitContext.tsx                # API-backed state layer (loading/busy/error toasts)
+│   │   └── TransitContext.tsx           # [UPDATED] React Context integrating API layer & state
 │   ├── services/
-│   │   └── api.ts                            # HTTP client + graph API types, request timeout
+│   │   ├── api.ts                       # [UPDATED] HTTP client linking frontend to SQL endpoints
+│   │   └── mockData.ts                  # Fallback initial seed data for local testing
 │   ├── types/
-│   │   └── transit.ts                        # Strict TypeScript models mirroring the SQL schema
-│   ├── App.tsx                               # Sidebar routing, API status strip, toast container
-│   ├── index.css · main.tsx · vite-env.d.ts
+│   │   └── transit.ts                   # Strict TypeScript models mirroring SQL schema
+│   ├── App.tsx                          # Root layout, sidebar routing, toast container
+│   ├── index.css                        # Tailwind directives and custom scrollbars
+│   └── main.tsx                         # React 18 DOM mount point
 │
-├── .env.example                             # VITE_API_BASE_URL
-├── index.html · package.json · postcss.config.js · tailwind.config.js
-└── tsconfig.json · vite.config.ts            # Strict TS (noUnusedLocals/Parameters) + Vite 5
+├── .env.example                         # Frontend environment variable template
+├── index.html                           # Single Page Application HTML root
+├── package.json                         # Client dependencies (React, Lucide, Tailwind)
+├── tailwind.config.js                   # High-contrast slate color tokens & styling rules
+├── tsconfig.json                        # TypeScript strict compiler options
+└── vite.config.ts                       # Vite bundler configuration & dev server proxy
 ```
 
 ---
 
 ## 🗄️ Relational Database Schema (SQL DDL)
 
-Here is the complete MySQL DDL schema defining all 14 normalized database tables, primary keys, foreign keys, and referential constraints (authoritative copy: [`database/schema.sql`](database/schema.sql), which also carries the demo seed data):
+Here is the complete ANSI SQL DDL schema defining all 11 normalized database tables, primary keys, foreign keys, and referential constraints:
 
 ```sql
 -- =================================================================
--- TRANSITFLOW RELATIONAL DATABASE SCHEMA (MySQL 8.0+ / MariaDB)
+-- TRANSITFLOW RELATIONAL DATABASE SCHEMA (MySQL 8.0+ / PostgreSQL)
 -- =================================================================
 
 DROP DATABASE IF EXISTS transit_management;
@@ -554,24 +548,12 @@ VITE_API_BASE_URL=http://localhost:5000/api
 ### 2. Backend (`backend/.env`)
 ```env
 PORT=5000
-
-# Relational database — the source of truth for all website CRUD
 DB_HOST=localhost
 DB_USER=root
 DB_PASSWORD=your_mysql_password
 DB_NAME=transit_management
 DB_PORT=3306
-
-# Graph layer (optional). The app runs without it: /api/graph/* answers 503
-# and every MySQL endpoint keeps working.
-NEO4J_URI=neo4j://localhost:7687
-NEO4J_USER=neo4j
-NEO4J_PASSWORD=your_neo4j_password
-NEO4J_DATABASE=neo4j
 ```
-
-> `backend/.env.example` contains placeholders only. Copy it to `backend/.env` and fill in
-> your own MySQL and Neo4j credentials — never commit the real values.
 
 ---
 
@@ -588,34 +570,18 @@ cd transit-management-system
 ```bash
 mysql -u root -p < database/schema.sql
 ```
-2. Verify all 14 tables and the demo rows are present:
+2. Verify all 11 tables are successfully created:
 ```sql
 USE transit_management;
 SHOW TABLES;
-SELECT COUNT(*) FROM stations;        -- 4
-SELECT COUNT(*) FROM route_stations;  -- 8
-SELECT COUNT(*) FROM bookings;        -- 1
 ```
-
-`database/schema.sql` is self-contained: it begins with `DROP DATABASE IF EXISTS
-transit_management`, so **re-running it wipes any data you have saved in that schema.**
-It ends with a labelled demo-data block (four stations, three routes, two vehicle types,
-two drivers, two vehicles, one trip with three scheduled stops, one booked journey) that is
-graph-rich enough to make the pathfinding demo meaningful — routes R001/R004 provide both a
-cheap two-hop journey and a pricier one-hop express alternative.
 
 ### Step 3: Run Backend API Server
 ```bash
 cd backend
-cp .env.example .env        # then edit .env with your own credentials
 npm install
-npm run dev                 # or: npm start
+npm run dev
 # Server will start on http://localhost:5000
-```
-Check both engines answered:
-```bash
-curl http://localhost:5000/api/health        # MySQL status
-curl http://localhost:5000/api/graph/health  # Neo4j status, or 503 if offline
 ```
 
 ### Step 4: Run Frontend Client
@@ -631,27 +597,6 @@ npm run dev
 Open your browser and navigate to:
 ```
 http://localhost:5173
-```
-
-### Step 6 (Optional): Load the Neo4j graph layer
-Neo4j is an *additional* store for network analytics; it never replaces MySQL.
-
-```bash
-# Community Edition via Docker
-docker run -d --name transit-neo4j -p 7474:7474 -p 7687:7687 \
-  -e NEO4J_AUTH=neo4j/your_neo4j_password neo4j:5-community
-
-# Populate / refresh the graph from MySQL (idempotent — safe to re-run)
-cd backend
-npm run sync:graph
-```
-
-`sync:graph` reads every MySQL table, `MERGE`s nodes and relationships by their natural keys,
-then deletes graph elements whose rows no longer exist in MySQL, and prints per-label counts.
-Use `npm run sync:graph:clean` to wipe the graph labels first and rebuild from scratch.
-The same refresh is available in the UI (Graph Explorer → **Sync from MySQL**), or over HTTP:
-```bash
-curl -X POST http://localhost:5000/api/graph/sync
 ```
 
 ---
@@ -681,142 +626,6 @@ curl -X POST http://localhost:5000/api/graph/sync
 - **Bookings**: Seat reservation engine with automated collision prevention on identical trips.
 - **Payments**: Multi-mode payment gateway integration (**UPI**, **Credit/Debit Card**, **Cash**).
 - **Digital Boarding Pass**: Realistic card view complete with transit branding, passenger details, seat number, and QR code representation.
-
-### 6. 🕸️ Graph Explorer (Neo4j)
-A focused section — not a redesign of the rest of the site — that reads the Neo4j projection:
-- **Health bar** showing engine status, node counts by label, `Check health` and `Sync from MySQL` actions, and an offline banner when Neo4j is down.
-- **Feature A — Stations along a route**: ordered `(:Route)-[:STOPS_AT {order}]->(:Station)` traversal.
-- **Feature B — Shortest path between two stations**: weighted by summed `distance_km`, with an
-  explicit "fewest hops = N hop(s) at X km" comparison so the difference between hop count and
-  distance optimisation is visible in the UI.
-- **Feature C — Passenger journeys**: `(:Passenger)-[:BOOKS]->(:Trip)-[:SERVES {arrival_time, departure_time}]->(:Station)` traversals.
-- **Network edges**: every `CONNECTS_TO` edge with its route, mode and distance.
-
-Every panel has loading, error, empty and success states. The section degrades to "graph layer
-offline" messages instead of breaking the page when Neo4j is unavailable.
-
----
-
-## 📡 REST API Reference
-
-All responses use one envelope: `{ "success": true, "data": … }` or
-`{ "success": false, "error": "…", "message": "…" }`. `GET /api/*` never returns a bare stack trace.
-
-### MySQL CRUD (the website's data source)
-
-| Method | Path | Notes |
-| --- | --- | --- |
-| GET | `/api/health` | MySQL connectivity + server version |
-| GET | `/api/dashboard` | Aggregated counts for the operations dashboard |
-| GET/POST | `/api/passengers` | List, create (contacts saved in the same transaction) |
-| GET/PUT/DELETE | `/api/passengers/:id` | Delete is blocked with `409` while bookings reference the passenger; repeat with `?force=true` to cascade |
-| — | `/api/stations`, `/api/routes`, `/api/route-stations`, `/api/vehicle-types`, `/api/drivers`, `/api/vehicles`, `/api/trip-stops`, `/api/payments`, `/api/tickets`, `/api/bookings` | Same CRUD shape and constraint handling |
-| GET | `/api/routes/:routeId/stops` | Ordered stop list |
-| PUT | `/api/routes/:routeId/station-order` | Re-sequences stops atomically |
-| POST | `/api/trips` | Creates the trip **and** its `trip_stops` in one transaction |
-| GET | `/api/trips/:tripId/stops` | Weak-entity timeline |
-| POST | `/api/bookings/checkout` | Booking + payment + ticket in one transaction |
-
-**Create a passenger**
-```bash
-curl -X POST http://localhost:5000/api/passengers \
-  -H 'Content-Type: application/json' \
-  -d '{
-        "passengerId": "P010",
-        "firstName": "Meena",
-        "lastName": "Ravi",
-        "email": "meena@example.com",
-        "gender": "F",
-        "dob": "2001-04-18",
-        "city": "Chennai",
-        "state": "TN",
-        "pin": "600017",
-        "contacts": ["9876500010", "9876500011"]
-      }'
-```
-```json
-{ "success": true, "data": { "passengerId": "P010", "firstName": "Meena", "contacts": ["9876500010", "9876500011"] } }
-```
-
-**Delete a referenced record** — the guard the brief asked for:
-```bash
-curl -X DELETE http://localhost:5000/api/stations/S001
-```
-```json
-{ "success": false,
-  "error": "Station S001 is referenced by 3 route stops and 1 trip stop. Delete or reassign those records first." }
-```
-HTTP status is `409`. The check counts referencing rows per table before issuing the `DELETE`, so
-the operator is told which records to fix instead of discovering it from a MySQL foreign-key
-error. An intentional cascade is available as `DELETE /api/stations/S001?force=true`, which skips
-the guard and lets the schema's own `ON DELETE CASCADE` rules run. A duplicate primary key, an
-unknown foreign key and a broken unique index each map to their own `409`/`400` message rather
-than a generic `500`.
-
-### Neo4j graph API
-
-| Method | Path | Feature |
-| --- | --- | --- |
-| GET | `/api/graph/health` | Connectivity + counts per label/relationship type |
-| POST | `/api/graph/sync` | Re-project MySQL → Neo4j, prune deleted rows |
-| GET | `/api/graph/routes/:routeId/stations` | A — stations along a route |
-| GET | `/api/graph/path/shortest?originId=&destinationId=&maxHops=` | B — weighted shortest path |
-| GET | `/api/graph/passengers/:passengerId/journeys` | C — passenger/booking traversal |
-| POST | `/api/graph/bookings` | C — booking demo, graph edge written after MySQL commits |
-| GET | `/api/graph/network` | Every `CONNECTS_TO` station-to-station edge (the explorer's topology panel) |
-
-`GET /api/graph/path/shortest?originId=S004&destinationId=S003` →
-```json
-{
-  "success": true,
-  "data": {
-    "originId": "S004", "destinationId": "S003",
-    "strategy": "weighted-distance (bounded trail enumeration ordered by summed distance_km)",
-    "maxHopsExplored": 8,
-    "totalHops": 2, "totalDistanceKm": 14.5,
-    "pathStations": [
-      { "stationId": "S004", "name": "T. Nagar Bus Hub" },
-      { "stationId": "S002", "name": "Guindy Junction" },
-      { "stationId": "S003", "name": "Airport Terminal" }
-    ],
-    "transitHops": [
-      { "routeId": "R004", "transitType": "Bus", "distanceKm": 8 },
-      { "routeId": "R001", "transitType": "Bus", "distanceKm": 6.5 }
-    ],
-    "hopCountOptimalComparison": { "hopCount": 2, "totalDistanceKm": 36, "routes": ["R004", "R003"] }
-  }
-}
-```
-The `hopCountOptimalComparison` block is the proof that this is a distance-optimal search: an
-equal-hop-count express alternative costs 36 km, and the endpoint still returns the 14.5 km path.
-
-When Neo4j is stopped, the same route answers `503` — and every MySQL CRUD route keeps working:
-```json
-{ "success": false,
-  "error": "The Neo4j graph database is unavailable. MySQL CRUD is unaffected.",
-  "details": "Failed to connect to 127.0.0.1:7687 - connect ECONNREFUSED" }
-```
-
----
-
-## 🧪 How to Test
-
-**MySQL CRUD (no Neo4j needed):** stop Neo4j, then walk the UI — create a passenger with two
-contact tags, edit the email, add a station, sequence it onto a route, create a trip with stops,
-run a booking checkout, then delete a station that a route still uses and confirm the `409`
-reference guard. `npm run build` type-checks the client with `tsc --noEmit` semantics.
-
-**Graph features:** with Neo4j running, `npm run sync:graph` inside `backend/`, open
-**Graph Explorer** in the sidebar, and (1) trace route `R003`, (2) search `S004 → S003` and read
-the distance-vs-hop-count comparison, (3) look up passenger `P001`, (4) book a seat from the
-Bookings module and watch the new `:BOOKS` edge appear after the next sync. Delete a booking row
-in MySQL, sync again, and the stale edge is pruned (the sync log prints the pruned counts).
-
-**Isolation check:** with Neo4j down, every `/api/*` CRUD route and the dashboard must still work,
-and Graph Explorer must show its offline banner rather than an app-wide crash.
-
-See [docs/GRAPH_DATABASE_JUSTIFICATION.md](docs/GRAPH_DATABASE_JUSTIFICATION.md) for the academic
-write-up, the Mermaid architecture diagram, and the list of what is tested versus proposed.
 
 ---
 

@@ -1,6 +1,6 @@
 -- =================================================================
 -- TRANSITFLOW: RELATIONAL DATABASE SCHEMA & SEED DATA
--- Target DBMS: MySQL 8.0+ / MariaDB (uses ENUM, GROUP_CONCAT and InnoDB FKs)
+-- Target DBMS: MySQL 8.0+ / MariaDB / PostgreSQL compatible
 -- =================================================================
 
 DROP DATABASE IF EXISTS transit_management;
@@ -204,57 +204,3 @@ INSERT INTO driver_contacts (driver_id, phone_number) VALUES
 INSERT INTO vehicles (vehicle_id, registration_no, manufacture_date, color, vehicle_type_id, assigned_driver_id) VALUES
 ('V001', 'TN-01-AB-1234', '2021-04-12', 'Ocean Blue', 'VT01', 'D001'),
 ('V002', 'METRO-EXP-01', '2023-08-01', 'Silver Indigo', 'VT02', 'D002');
-
--- =================================================================
--- DEMO DATA FOR THE OPERATIONAL TABLES AND THE GRAPH EXPLORER
--- -----------------------------------------------------------------
--- The original seed stopped at vehicles, so trips, trip_stops,
--- bookings, payments and tickets were empty and the Neo4j booking
--- traversal had nothing to show. These rows are clearly-labelled
--- academic demo data, not production records.
---
--- R003 is modelled as a non-stop express: its measured alignment
--- (32 km) is longer than the 15 km R001 corridor that calls at
--- S002. That makes the distance-optimal S001 -> S003 journey the
--- two-hop R001 path, while the fewest-hops path is the one-hop
--- express — the case the weighted pathfinder has to get right.
--- =================================================================
-
-INSERT INTO stations (station_id, name, city, area, landmark) VALUES
-('S004', 'T. Nagar Bus Hub', 'Chennai', 'T. Nagar', 'Panagal Park');
-
-INSERT INTO routes (route_id, name, type, total_distance_km) VALUES
-('R004', 'Central - T. Nagar - Guindy Feeder', 'Bus', 12.00);
-
-UPDATE routes SET total_distance_km = 32.00 WHERE route_id = 'R003';
-
-INSERT INTO route_stations (id, route_id, station_id, stop_order, distance_from_start_km) VALUES
-('R003-S001', 'R003', 'S001', 1, 0.00),
-('R003-S003', 'R003', 'S003', 2, 32.00),
-('R004-S001', 'R004', 'S001', 1, 0.00),
-('R004-S004', 'R004', 'S004', 2, 4.00),
-('R004-S002', 'R004', 'S002', 3, 12.00);
-
-INSERT INTO passengers (passenger_id, first_name, last_name, email, gender, dob, door_no, street, city, state, pin) VALUES
-('P003', 'Deepa', 'Iyer', 'deepa@example.com', 'F', '2001-01-20', '7', 'Raja St', 'Chennai', 'TN', '600017');
-
-INSERT INTO passenger_contacts (passenger_id, phone_number) VALUES
-('P003', '9876500011'),
-('P003', '9876500012');
-
-INSERT INTO trips (trip_id, date, start_time, end_time, route_id) VALUES
-('T001', '2026-11-02', '08:00:00', '08:45:00', 'R001');
-
-INSERT INTO trip_stops (id, trip_id, station_id, stop_order, arrival_time, departure_time, status) VALUES
-('T001-S001-1', 'T001', 'S001', 1, '08:00:00', '08:05:00', 'Scheduled'),
-('T001-S002-2', 'T001', 'S002', 2, '08:22:00', '08:25:00', 'Scheduled'),
-('T001-S003-3', 'T001', 'S003', 3, '08:45:00', '08:45:00', 'Scheduled');
-
-INSERT INTO bookings (booking_id, passenger_id, trip_id, seat_number, date, status) VALUES
-('B001', 'P001', 'T001', 'A01', '2026-11-02', 'Confirmed');
-
-INSERT INTO payments (payment_id, mode, amount, date, txn_reference_no) VALUES
-('PAY001', 'UPI', 40.00, '2026-10-20', 'TXN-UPI-111111');
-
-INSERT INTO tickets (ticket_id, booking_id, passenger_id, trip_id, issue_date, ticket_type, travel_class, payment_id) VALUES
-('TK001', 'B001', 'P001', 'T001', '2026-10-20', 'Regular', 'General', 'PAY001');

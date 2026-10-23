@@ -27,10 +27,10 @@ export const BookingModule: React.FC = () => {
     addBooking,
     updateBooking,
     deleteBooking,
-    checkoutBooking,
     addPayment,
     updatePayment,
     deletePayment,
+    addTicket,
     deleteTicket,
     globalSearch,
   } = useTransit();
@@ -51,7 +51,7 @@ export const BookingModule: React.FC = () => {
   const [previewTicket, setPreviewTicket] = useState<Ticket | null>(null);
   const [deleteTicketTarget, setDeleteTicketTarget] = useState<Ticket | null>(null);
 
-  const handleSaveBooking = async (
+  const handleSaveBooking = (
     booking: Booking,
     issueTicketAndPayment: boolean,
     ticketDetails?: {
@@ -61,14 +61,41 @@ export const BookingModule: React.FC = () => {
       paymentMode: PaymentMode;
     }
   ) => {
+    let success = false;
     if (bookingToEdit) {
-      return updateBooking(booking);
+      success = updateBooking(booking);
+    } else {
+      success = addBooking(booking);
+      if (success && issueTicketAndPayment && ticketDetails) {
+        const paymentId = `PAY00${Math.floor(10 + Math.random() * 90)}`;
+        const ticketId = `TK00${Math.floor(10 + Math.random() * 90)}`;
+        const today = new Date().toISOString().slice(0, 10);
+
+        // 1. Create Payment
+        const paymentRecord: Payment = {
+          paymentId,
+          mode: ticketDetails.paymentMode,
+          amount: ticketDetails.amount,
+          date: today,
+          txnReferenceNo: `TXN-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
+        };
+        addPayment(paymentRecord);
+
+        // 2. Create Ticket
+        const ticketRecord: Ticket = {
+          ticketId,
+          bookingId: booking.bookingId,
+          passengerId: booking.passengerId,
+          tripId: booking.tripId,
+          issueDate: today,
+          ticketType: ticketDetails.ticketType,
+          travelClass: ticketDetails.travelClass,
+          paymentId,
+        };
+        addTicket(ticketRecord);
+      }
     }
-    if (issueTicketAndPayment && ticketDetails) {
-      // Booking + payment + ticket are written by one MySQL transaction.
-      return checkoutBooking(booking, ticketDetails);
-    }
-    return addBooking(booking);
+    return success;
   };
 
   // Columns: Bookings

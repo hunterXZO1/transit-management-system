@@ -18,8 +18,6 @@ export const Header: React.FC = () => {
         return { title: 'Trip Scheduling & Timeline', desc: 'Scheduled runs with weak-entity Station Arrival/Departure stop times' };
       case 'bookings':
         return { title: 'Bookings, Tickets & Payments', desc: 'Passenger M:N trip reservations, fares, and ticket issuance' };
-      case 'graph':
-        return { title: 'Graph Explorer', desc: 'Neo4j route, pathfinding and booking traversals read from MySQL-synced data' };
       default:
         return { title: 'Transit Management System', desc: '' };
     }

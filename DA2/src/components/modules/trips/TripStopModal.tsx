@@ -6,7 +6,7 @@ import { Modal } from '../../common/Modal';
 interface TripStopModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (stop: TripStop) => Promise<boolean>;
+  onSave: (stop: TripStop) => boolean;
   activeTripId: string;
   stopToEdit?: TripStop | null;
   suggestedOrder?: number;
@@ -64,14 +64,14 @@ export const TripStopModal: React.FC<TripStopModalProps> = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
     const finalData = {
       ...formData,
       id: formData.id || `${activeTripId}-${formData.stationId}-${formData.stopOrder}`,
     };
-    const success = await onSave(finalData);
+    const success = onSave(finalData);
     if (success) {
       onClose();
     }

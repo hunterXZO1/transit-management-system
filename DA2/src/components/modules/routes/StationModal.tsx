@@ -5,7 +5,7 @@ import { Modal } from '../../common/Modal';
 interface StationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (station: Station) => Promise<boolean>;
+  onSave: (station: Station) => boolean;
   stationToEdit?: Station | null;
 }
 
@@ -53,10 +53,10 @@ export const StationModal: React.FC<StationModalProps> = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-    const success = await onSave(formData);
+    const success = onSave(formData);
     if (success) {
       onClose();
     }

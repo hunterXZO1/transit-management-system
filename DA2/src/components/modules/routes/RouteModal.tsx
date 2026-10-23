@@ -5,7 +5,7 @@ import { Modal } from '../../common/Modal';
 interface RouteModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (route: Route) => Promise<boolean>;
+  onSave: (route: Route) => boolean;
   routeToEdit?: Route | null;
 }
 
@@ -51,10 +51,10 @@ export const RouteModal: React.FC<RouteModalProps> = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-    const success = await onSave(formData);
+    const success = onSave(formData);
     if (success) {
       onClose();
     }
