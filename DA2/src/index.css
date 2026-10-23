@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-100/75 text-slate-900 antialiased font-sans selection:bg-emerald-500 selection:text-white;
+  }
+}
+
+/* Custom sleek scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Print styling for Boarding Pass */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print\:bg-white, .print\:bg-white * {
+    visibility: visible;
+  }
+  .print\:border-black {
+    border-color: #000 !important;
+  }
+}
