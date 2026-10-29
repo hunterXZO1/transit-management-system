@@ -1,4 +1,4 @@
-// HTTP client for the TransitFlow Express + MySQL + Neo4j backend.
+// HTTP client for the TransitFlow Express + MySQL + ArangoDB backend.
 import type {
   Booking,
   Driver,
@@ -145,7 +145,7 @@ export const crud = {
   },
 };
 
-// ---- Neo4j graph API ----
+// ---- ArangoDB graph API ----
 
 export interface GraphRouteStop {
   stationId: string;
@@ -239,6 +239,6 @@ export const graphApi = {
   passengerJourneys: (passengerId: string) =>
     get<GraphPassengerJourneys>(`/graph/passengers/${encodeURIComponent(passengerId)}/journeys`),
   bookTrip: (payload: { passenger: { passengerId: string; firstName?: string; lastName?: string; city?: string }; tripId: string; seatNumber: string; date: string }) =>
-    post<{ relational: Booking; graph: Record<string, unknown> | null }>('/graph/bookings', payload),
+    post<{ relational: Booking; graph: Record<string, unknown> | null; partialSuccess: boolean; graphSyncPending: boolean; warning?: string }>('/graph/bookings', payload),
   sync: () => post<GraphSyncResult>('/graph/sync', {}),
 };

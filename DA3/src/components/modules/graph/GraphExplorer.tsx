@@ -82,6 +82,7 @@ export const GraphExplorer: React.FC = () => {
   const [healthError, setHealthError] = useState<string | null>(null);
   const [healthLoading, setHealthLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [revision, setRevision] = useState(0);
 
   const loadHealth = useCallback(async () => {
     setHealthLoading(true);
@@ -113,6 +114,10 @@ export const GraphExplorer: React.FC = () => {
           result.graph.relationships?.CONNECTS_TO ?? 0
         } connections synced from MySQL${pruned ? `; ${pruned.relationships} stale relationship(s) pruned` : ''}.`
       );
+      setRevision(value => value + 1);
+      setRouteDetail(null);
+      setPath(null);
+      setJourneys(null);
       await loadHealth();
     } catch (err) {
       addToast('error', 'Sync failed', messageOf(err));
@@ -201,7 +206,7 @@ export const GraphExplorer: React.FC = () => {
           </span>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <p className="text-sm font-bold text-slate-900">Neo4j graph layer</p>
+              <p className="text-sm font-bold text-slate-900">ArangoDB graph layer</p>
               {healthLoading ? (
                 <Badge size="sm" variant="neutral">
                   checking
@@ -240,7 +245,7 @@ export const GraphExplorer: React.FC = () => {
       {!healthLoading && !health && (
         <StateLine
           kind="error"
-          text="The graph API is unreachable, so these three panels cannot run. MySQL CRUD stays fully functional — start Neo4j, or run: npm run sync:graph"
+          text="The graph API is unreachable, so these three panels cannot run. MySQL CRUD stays fully functional — start ArangoDB, or run: npm run sync:graph"
         />
       )}
 
@@ -248,7 +253,7 @@ export const GraphExplorer: React.FC = () => {
         {/* A */}
         <Panel
           title="Stations along a route"
-          subtitle="Graph walk of (:Route)-[:STOPS_AT]->(:Station) ordered by stop order"
+          subtitle="Graph walk of Route → STOPS_AT → Station ordered by stop order"
           icon={<RouteIcon className="w-4 h-4" />}
         >
           <div className="flex flex-col sm:flex-row gap-2">
@@ -267,7 +272,7 @@ export const GraphExplorer: React.FC = () => {
           </div>
 
           <div className="mt-4">
-            {routeState === 'loading' && <StateLine kind="loading" text="Traversing the route in Neo4j…" />}
+            {routeState === 'loading' && <StateLine kind="loading" text="Traversing the route in ArangoDB…" />}
             {routeState === 'error' && <StateLine kind="error" text={routeError} />}
             {routeState === 'empty' && <StateLine kind="empty" text="This route has no stops in the graph yet." />}
             {routeState === 'idle' && !routeDetail && (
@@ -299,7 +304,7 @@ export const GraphExplorer: React.FC = () => {
         {/* B */}
         <Panel
           title="Shortest journey between two stations"
-          subtitle="Weighted on CONNECTS_TO.distance_km, not on the number of hops"
+          subtitle="Shortest distance within 8 hops using CONNECTS_TO.distance_km"
           icon={<MapPin className="w-4 h-4" />}
         >
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr_auto] gap-2 items-center">
@@ -332,7 +337,7 @@ export const GraphExplorer: React.FC = () => {
           </div>
 
           <div className="mt-4">
-            {pathState === 'loading' && <StateLine kind="loading" text="Enumerating bounded trails and summing distances…" />}
+            {pathState === 'loading' && <StateLine kind="loading" text="Finding the shortest distance within 8 hops…" />}
             {pathState === 'error' && <StateLine kind="error" text={pathError} />}
             {pathState === 'empty' && <StateLine kind="empty" text="No connected path was found." />}
             {pathState === 'idle' && !path && (
@@ -378,7 +383,7 @@ export const GraphExplorer: React.FC = () => {
         {/* C */}
         <Panel
           title="Passenger journeys"
-          subtitle="(:Passenger)-[:BOOKS]->(:Trip)-[:OPERATES]->(:Route) traversal"
+          subtitle="Passenger → BOOKS → Trip → OPERATES → Route traversal"
           icon={<Users className="w-4 h-4" />}
         >
           <div className="flex flex-col sm:flex-row gap-2">
@@ -405,7 +410,7 @@ export const GraphExplorer: React.FC = () => {
             {journeyState === 'loading' && <StateLine kind="loading" text="Reading booking relationships…" />}
             {journeyState === 'error' && <StateLine kind="error" text={journeyError} />}
             {journeyState === 'empty' && (
-              <StateLine kind="empty" text="This passenger has no :BOOKS relationship in the graph. Create a booking, then run Sync from MySQL." />
+              <StateLine kind="empty" text="This passenger has no BOOKS edge in the graph. Create a booking, then run Sync from MySQL." />
             )}
             {journeyState === 'idle' && !journeys && (
               <p className="text-xs text-slate-400">Pick a passenger to see the trips they are linked to.</p>
@@ -439,10 +444,10 @@ export const GraphExplorer: React.FC = () => {
         {/* Network topology */}
         <Panel
           title="Connectivity edges"
-          subtitle="Every (:Station)-[:CONNECTS_TO]->(:Station) edge built from route stop adjacency"
+          subtitle="Every Station → CONNECTS_TO → Station edge built from route stop adjacency"
           icon={<Database className="w-4 h-4" />}
         >
-          <NetworkEdges />
+          <NetworkEdges key={revision} />
         </Panel>
       </div>
     </div>

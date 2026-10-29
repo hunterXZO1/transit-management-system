@@ -1,0 +1,28 @@
+name: transitflow
+services:
+  mysql:
+    image: mysql:8.4
+    ports:
+      - "127.0.0.1:${MYSQL_PORT:-3306}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_ROOT_PASSWORD mysqladmin ping -h 127.0.0.1 -u root --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  arangodb:
+    image: arangodb:3.12.4
+    ports:
+      - "127.0.0.1:${ARANGO_PORT:-8529}:8529"
+    environment:
+      ARANGO_ROOT_PASSWORD: ${ARANGO_PASSWORD:?Set ARANGO_PASSWORD in .env}
+    volumes:
+      - arango_data:/var/lib/arangodb3
+      - arango_apps:/var/lib/arangodb3-apps
+volumes:
+  mysql_data:
+  arango_data:
+  arango_apps:

@@ -7,11 +7,11 @@ import {
   bookTripSeat,
   getNetworkGraph,
   triggerSync,
-} from '../controllers/neo4jTransitController.js';
+} from '../controllers/arangoTransitController.js';
 
 const router = express.Router();
 
-// Neo4j availability + node/relationship counts. Never blocks MySQL CRUD.
+// ArangoDB availability + node/relationship counts. Never blocks MySQL CRUD.
 router.get('/health', healthCheck);
 
 // Rebuild the graph from MySQL (source of truth). Idempotent.

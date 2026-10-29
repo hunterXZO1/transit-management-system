@@ -209,7 +209,7 @@ INSERT INTO vehicles (vehicle_id, registration_no, manufacture_date, color, vehi
 -- DEMO DATA FOR THE OPERATIONAL TABLES AND THE GRAPH EXPLORER
 -- -----------------------------------------------------------------
 -- The original seed stopped at vehicles, so trips, trip_stops,
--- bookings, payments and tickets were empty and the Neo4j booking
+-- bookings, payments and tickets were empty and the graph booking
 -- traversal had nothing to show. These rows are clearly-labelled
 -- academic demo data, not production records.
 --

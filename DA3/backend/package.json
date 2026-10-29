@@ -7,17 +7,21 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "sync:graph": "node database/sync-mysql-to-neo4j.js",
-    "sync:graph:clean": "node database/sync-mysql-to-neo4j.js --clean"
+    "sync:graph": "node database/sync-mysql-to-arango.js",
+    "test:integration": "node --test tests/graph.integration.test.js",
+    "init:graph": "node database/init-arango.js"
   },
   "dependencies": {
+    "arangojs": "10.6.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "mysql2": "^3.11.0",
-    "neo4j-driver": "^6.2.0"
+    "mysql2": "^3.11.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.4"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

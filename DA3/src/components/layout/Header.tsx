@@ -19,7 +19,7 @@ export const Header: React.FC = () => {
       case 'bookings':
         return { title: 'Bookings, Tickets & Payments', desc: 'Passenger M:N trip reservations, fares, and ticket issuance' };
       case 'graph':
-        return { title: 'Graph Explorer', desc: 'Neo4j route, pathfinding and booking traversals read from MySQL-synced data' };
+        return { title: 'Graph Explorer', desc: 'ArangoDB route, pathfinding and booking traversals read from MySQL-synced data' };
       default:
         return { title: 'Transit Management System', desc: '' };
     }
